@@ -10,6 +10,7 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
     canvas{display:block;touch-action:none}
     #inv-canvas{touch-action:pan-x;}
     #inventory{touch-action:pan-x;}
+
     #overlay{
       position:fixed;inset:0;background:#1a1a2e;
       display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
@@ -25,7 +26,7 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
       display:none;z-index:200;pointer-events:none;
     }
     #info{
-      position:fixed;bottom:120px;left:50%;transform:translateX(-50%);
+      position:fixed;bottom:130px;left:50%;transform:translateX(-50%);
       background:rgba(0,0,0,0.52);color:rgba(255,255,255,0.88);
       padding:5px 14px;border-radius:16px;
       font-family:sans-serif;font-size:11px;
@@ -58,6 +59,73 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
       display:flex;align-items:center;justify-content:center;
     }
     .selbtn.red{background:rgba(233,69,96,0.75)}
+
+    /* ══════════════════════════════════════════
+       SURFACE PICKER (bottom sheet)
+    ══════════════════════════════════════════ */
+    #surf-sheet{
+      position:fixed;
+      bottom:-230px;left:0;right:0;
+      height:220px;
+      background:rgba(8,8,22,0.97);
+      border-top:1px solid rgba(255,255,255,0.12);
+      border-radius:18px 18px 0 0;
+      z-index:150;
+      transition:bottom 0.32s cubic-bezier(0.34,1.2,0.64,1);
+      padding:0 16px 14px;
+      backdrop-filter:blur(12px);
+    }
+    #surf-sheet.open{bottom:120px;}
+    #surf-handle{
+      width:34px;height:3px;border-radius:2px;
+      background:rgba(255,255,255,0.2);
+      margin:10px auto 10px;
+    }
+    #surf-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:10px;
+    }
+    #surf-title{
+      color:#fff;font-family:sans-serif;font-size:12px;
+      font-weight:700;letter-spacing:0.5px;
+    }
+    #surf-close{
+      background:rgba(255,255,255,0.1);border:none;
+      border-radius:50%;color:rgba(255,255,255,0.6);
+      width:24px;height:24px;font-size:13px;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+    }
+    #surf-colors{
+      display:flex;flex-wrap:wrap;gap:8px;
+      justify-content:flex-start;
+      overflow-y:auto;max-height:148px;
+      padding:2px 0;
+    }
+    #surf-colors::-webkit-scrollbar{height:0;width:0;}
+    .swatch-wrap{
+      display:flex;flex-direction:column;align-items:center;gap:3px;
+    }
+    .swatch{
+      width:38px;height:38px;border-radius:10px;
+      border:2px solid rgba(255,255,255,0.08);
+      cursor:pointer;
+      transition:border-color 0.18s,transform 0.15s;
+      flex-shrink:0;
+    }
+    .swatch.active{
+      border-color:#fff;
+      transform:scale(1.08);
+      box-shadow:0 0 0 2px rgba(255,255,255,0.2);
+    }
+    .swatch-name{
+      color:#606080;font-size:6px;font-family:sans-serif;
+      text-align:center;width:40px;overflow:hidden;
+      text-overflow:ellipsis;white-space:nowrap;
+    }
+
+    /* ══════════════════════════════════════════
+       INVENTORY
+    ══════════════════════════════════════════ */
     #inventory{
       position:fixed;bottom:10px;left:0px;right:0px;height:110px;
       background:#0a0a1a;border-top:2px solid #848494;
@@ -88,6 +156,20 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
       background:rgba(76,175,80,0.9);
       border-color:rgba(255,255,255,0.4);
     }
+
+    /* Bouton + inventaire */
+    #inv-add{
+      position:fixed;bottom:50px;right:10px;
+      width:34px;height:34px;border-radius:50%;
+      background:#e94560;border:none;color:#fff;
+      font-size:22px;line-height:1;font-weight:300;
+      cursor:pointer;z-index:20;
+      display:none;align-items:center;justify-content:center;
+      box-shadow:0 3px 12px rgba(233,69,96,0.55);
+      transition:transform 0.15s;
+    }
+    #inv-add.show{display:flex;}
+
     #no-items{
       position:fixed;bottom:0;left:0;right:0;height:110px;
       display:flex;align-items:center;justify-content:center;
@@ -95,6 +177,89 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
       z-index:10;pointer-events:none;
     }
     #no-items span{color:#404060;font-family:sans-serif;font-size:13px;}
+
+    /* ══════════════════════════════════════════
+       CATALOGUE MODAL
+    ══════════════════════════════════════════ */
+    #cat-overlay{
+      position:fixed;inset:0;
+      background:rgba(0,0,0,0.5);
+      z-index:200;display:none;
+      opacity:0;transition:opacity 0.3s;
+    }
+    #cat-overlay.open{
+      display:block;opacity:1;
+    }
+    #cat-sheet{
+      position:fixed;bottom:0;left:0;right:0;
+      height:70vh;max-height:600px;
+      background:rgba(8,8,22,0.98);
+      border-top:1px solid rgba(255,255,255,0.12);
+      border-radius:20px 20px 0 0;
+      z-index:210;
+      transition:transform 0.32s cubic-bezier(0.34,1.2,0.64,1);
+      transform:translateY(100%);
+      padding:0 16px 20px;
+      backdrop-filter:blur(12px);
+      display:flex;flex-direction:column;
+    }
+    #cat-sheet.open{
+      transform:translateY(0);
+    }
+    #cat-handle{
+      width:34px;height:3px;border-radius:2px;
+      background:rgba(255,255,255,0.2);
+      margin:10px auto 12px;
+    }
+    #cat-header{
+      display:flex;align-items:center;justify-content:space-between;
+      margin-bottom:12px;
+    }
+    #cat-title{
+      color:#fff;font-family:sans-serif;font-size:14px;
+      font-weight:700;letter-spacing:0.5px;
+    }
+    #cat-close{
+      background:rgba(255,255,255,0.1);border:none;
+      border-radius:50%;color:rgba(255,255,255,0.6);
+      width:28px;height:28px;font-size:16px;
+      cursor:pointer;display:flex;align-items:center;justify-content:center;
+      transition:background 0.2s;
+    }
+    #cat-close:active{background:rgba(255,255,255,0.2);}
+    #cat-list{
+      flex:1;overflow-y:auto;padding:8px 0;
+      display:flex;flex-direction:column;gap:6px;
+    }
+    #cat-list::-webkit-scrollbar{width:4px;}
+    #cat-list::-webkit-scrollbar-track{background:transparent;}
+    #cat-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px;}
+    .cat-item{
+      background:rgba(20,60,100,0.6);border:1px solid rgba(255,255,255,0.1);
+      border-radius:12px;padding:12px 14px;
+      display:flex;align-items:center;justify-content:space-between;
+      cursor:pointer;transition:all 0.15s;
+    }
+    .cat-item:active{
+      background:rgba(30,80,140,0.8);
+      border-color:rgba(76,175,80,0.4);
+      transform:scale(0.98);
+    }
+    .cat-info{
+      display:flex;flex-direction:column;gap:2px;
+    }
+    .cat-name{
+      color:#fff;font-family:sans-serif;font-size:13px;font-weight:600;
+    }
+    .cat-desc{
+      color:#909090;font-family:sans-serif;font-size:11px;
+    }
+    .cat-btn{
+      background:#4caf50;border:none;border-radius:8px;
+      color:#fff;padding:6px 12px;font-size:12px;font-weight:600;
+      cursor:pointer;transition:background 0.2s;
+    }
+    .cat-btn:active{background:#45a049;}
   </style>
 </head>
 <body>
@@ -108,12 +273,14 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
 <div id="loading">⏳ Chargement du modèle...</div>
 <div id="info">Tape un meuble de l'inventaire pour l'ajouter</div>
 
+<!-- Camera buttons -->
 <div id="topbar">
   <button class="tbtn" onclick="setCameraIso()" title="Vue 3D isométrique">◈</button>
   <button class="tbtn" onclick="setCameraTop()" title="Vue de dessus">⊞</button>
   <button class="tbtn" onclick="setCameraFront()" title="Vue de face">◻</button>
 </div>
 
+<!-- Furniture selection bar -->
 <div id="selbar">
   <span id="selname">Meuble</span>
   <button class="selbtn" onclick="rotSel(-90)">↺</button>
@@ -121,6 +288,17 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
   <button class="selbtn red" onclick="delSel()">🗑</button>
 </div>
 
+<!-- ── SURFACE PICKER ────────────────────────────── -->
+<div id="surf-sheet">
+  <div id="surf-handle"></div>
+  <div id="surf-header">
+    <div id="surf-title">Couleur du mur</div>
+    <button id="surf-close">✕</button>
+  </div>
+  <div id="surf-colors"></div>
+</div>
+
+<!-- ── INVENTORY ──────────────────────────────────── -->
 <div id="inventory">
   <div id="inv-wrap">
     <canvas id="inv-canvas"></canvas>
@@ -130,6 +308,20 @@ export const getEditorHTML = (roomW = 5, roomH = 5) => `<!DOCTYPE html>
 <div id="no-items">
   <span>Chargement des meubles…</span>
 </div>
+
+<!-- + button above inventory -->
+<button id="inv-add">+</button>
+
+<!-- ── CATALOGUE MODAL ─────────────────────────────── -->
+<div id="cat-sheet">
+  <div id="cat-handle"></div>
+  <div id="cat-header">
+    <div id="cat-title">Ajouter un meuble</div>
+    <button id="cat-close">✕</button>
+  </div>
+  <div id="cat-list"></div>
+</div>
+<div id="cat-overlay"></div>
 
 <script type="importmap">
 {
@@ -146,7 +338,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const RW = ${roomW}, RH = ${roomH};
-const INV_H = 110, MODEL_H = 80;
+const INV_H = 120, MODEL_H = 80;
 
 const overlay   = document.getElementById('overlay');
 const loadingEl = document.getElementById('loading');
@@ -207,6 +399,7 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI/2;
 floor.position.set(RW/2, 0, RH/2);
 floor.receiveShadow = true;
+floor.userData.surfType = 'floor';
 scene.add(floor);
 
 // ── Grille ─────────────────────────────────────────────────────────────────
@@ -218,22 +411,37 @@ scene.add(grid);
 
 // ── Murs ───────────────────────────────────────────────────────────────────
 const WH = 3.2;
-const wallMat = () => new THREE.MeshLambertMaterial({color:0xece0ce, side:THREE.FrontSide, transparent:true, opacity:0.88});
-function addWall(w,h,x,y,z,ry){
+const walls = {}; // ← {back, left, right}
+const wallColors = {back: 0xece0ce, left: 0xece0ce, right: 0xece0ce};
+
+const wallMat = () => new THREE.MeshLambertMaterial({
+  color:0xece0ce, side:THREE.FrontSide, transparent:true, opacity:0.88
+});
+
+function addWall(id, w,h,x,y,z,ry){
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), wallMat());
-  m.position.set(x,y,z); m.rotation.y=ry; scene.add(m);
+  m.position.set(x,y,z);
+  m.rotation.y = ry;
+  m.userData.surfType = 'wall';
+  m.userData.wallId = id;
+  scene.add(m);
+  walls[id] = m;
 }
-addWall(RW, WH, RW/2, WH/2, 0,        0);
-addWall(RH, WH, 0,   WH/2, RH/2,  Math.PI/2);
-addWall(RH, WH, RW,  WH/2, RH/2, -Math.PI/2);
+addWall('back', RW, WH, RW/2, WH/2, 0,        0);
+addWall('left', RH, WH, 0,   WH/2, RH/2,  Math.PI/2);
+addWall('right', RH, WH, RW,  WH/2, RH/2, -Math.PI/2);
+
 const lineMat = new THREE.LineBasicMaterial({color:0xb89a6a});
 function addLine(pts){
-  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(...p))), lineMat));
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(...p))),
+    lineMat
+  ));
 }
 addLine([[0,0,0],[RW,0,0]]); addLine([[0,0,0],[0,0,RH]]);
 addLine([[RW,0,0],[RW,0,RH]]); addLine([[0,0,RH],[RW,0,RH]]);
 
-// ── État ───────────────────────────────────────────────────────────────────
+// ── État furniture ─────────────────────────────────────────────────────────
 const FURN      = {};
 const INV_ITEMS = [];
 const loader    = new GLTFLoader();
@@ -292,8 +500,149 @@ function notifyPos(id){
   toRN({type:'positionUpdate',id,x:p.x,z:p.z,rotation:FURN[id].root.rotation.y});
 }
 
+// ══════════════════════════════════════════════════════════
+//  WALL SIDEBAR
+// ══════════════════════════════════════════════════════════
+const WALL_PRESETS = [
+  {id:'beige',    label:'Beige',      color:'#ece0ce', hex:0xece0ce},
+  {id:'white',    label:'Blanc',      color:'#f4f1ec', hex:0xf4f1ec},
+  {id:'grey',     label:'Gris',       color:'#b8b4ae', hex:0xb8b4ae},
+  {id:'dark',     label:'Sombre',     color:'#3d3d5c', hex:0x3d3d5c},
+  {id:'brick',    label:'Brique',     color:'#b5674d', hex:0xb5674d},
+  {id:'sage',     label:'Sauge',      color:'#8fad8f', hex:0x8fad8f},
+  {id:'navy',     label:'Marine',     color:'#2d4a7a', hex:0x2d4a7a},
+  {id:'terra',    label:'Terracotta', color:'#cc7a5a', hex:0xcc7a5a},
+  {id:'blush',    label:'Rose',       color:'#e8b4b8', hex:0xe8b4b8},
+  {id:'mint',     label:'Menthe',     color:'#a8d8c8', hex:0xa8d8c8},
+  {id:'lemon',    label:'Citron',     color:'#e0d88a', hex:0xe0d88a},
+  {id:'lavender', label:'Lavande',    color:'#c4b0d8', hex:0xc4b0d8},
+];
+
+const FLOOR_PRESETS = [
+  {id:'wood',     label:'Bois clair', color:'#f2e4c8', hex:0xf2e4c8},
+  {id:'darkw',    label:'Bois foncé', color:'#8b6340', hex:0x8b6340},
+  {id:'marble',   label:'Marbre',     color:'#e4e4e0', hex:0xe4e4e0},
+  {id:'concrete', label:'Béton',      color:'#9a9898', hex:0x9a9898},
+  {id:'terra',    label:'Terracotta', color:'#cc7a5a', hex:0xcc7a5a},
+  {id:'black',    label:'Noir',       color:'#1e1e28', hex:0x1e1e28},
+  {id:'parquet',  label:'Parquet',    color:'#c8a060', hex:0xc8a060},
+  {id:'teal',     label:'Bleu-vert',  color:'#4a8a7a', hex:0x4a8a7a},
+];
+
+let activeWallPresetId  = 'beige';
+let activeFloorPresetId = 'wood';
+let currentWallId = null; // ← track quel mur a été touché
+
+function applyWallColor(hex, id, wallId){
+  if(wallId && walls[wallId]){
+    walls[wallId].material.color.setHex(hex);
+    walls[wallId].material.needsUpdate = true;
+    wallColors[wallId] = hex;
+    activeWallPresetId = id;
+  }
+  document.querySelectorAll('.swatch').forEach(b=>{
+    b.classList.toggle('active', b.dataset.id === id);
+  });
+  toRN({type:'wallColorChanged', color:'#'+hex.toString(16).padStart(6,'0'), wallId});
+}
+
+function applyFloorColor(hex, id){
+  floor.material.color.setHex(hex);
+  floor.material.needsUpdate = true;
+  activeFloorPresetId = id;
+  document.querySelectorAll('.swatch').forEach(b=>{
+    b.classList.toggle('active', b.dataset.id === id);
+  });
+  toRN({type:'floorColorChanged', color:'#'+hex.toString(16).padStart(6,'0')});
+}
+
+// ══════════════════════════════════════════════════════════
+//  SURFACE PICKER (tap mur/sol → bottom sheet)
+// ══════════════════════════════════════════════════════════
+const surfSheet  = document.getElementById('surf-sheet');
+const surfTitle  = document.getElementById('surf-title');
+const surfColors = document.getElementById('surf-colors');
+let surfPickerOpen = false;
+let currentSurfType = null;
+let currentSurfId = null;
+
+document.getElementById('surf-close').addEventListener('touchend', e=>{
+  e.preventDefault(); closeSurfPicker();
+});
+document.getElementById('surf-close').addEventListener('click', ()=>closeSurfPicker());
+
+function openSurfPicker(type, surfId){
+  currentSurfType = type;
+  currentSurfId = surfId;
+  
+  if(type === 'wall'){
+    surfTitle.textContent = 'Couleur du mur - ' + (surfId === 'back' ? 'Fond' : surfId === 'left' ? 'Gauche' : 'Droite');
+  } else {
+    surfTitle.textContent = 'Textures du sol';
+  }
+  
+  surfColors.innerHTML = '';
+  const presets = type === 'wall' ? WALL_PRESETS : FLOOR_PRESETS;
+  const activeId = type === 'wall' ? activeWallPresetId : activeFloorPresetId;
+
+  presets.forEach(function(p){
+    const wrap = document.createElement('div');
+    wrap.className = 'swatch-wrap';
+    const sw = document.createElement('div');
+    sw.className = 'swatch' + (p.id === activeId ? ' active' : '');
+    sw.style.background = p.color;
+    sw.addEventListener('touchend', function(e){
+      e.preventDefault();
+      if(type === 'wall') applyWallColor(p.hex, p.id, surfId);
+      else applyFloorColor(p.hex, p.id);
+      surfColors.querySelectorAll('.swatch').forEach(function(s){ s.classList.remove('active'); });
+      sw.classList.add('active');
+    });
+    const nm = document.createElement('span');
+    nm.className = 'swatch-name';
+    nm.textContent = p.label;
+    wrap.appendChild(sw);
+    wrap.appendChild(nm);
+    surfColors.appendChild(wrap);
+  });
+
+  surfSheet.classList.add('open');
+  surfPickerOpen = true;
+}
+
+function closeSurfPicker(){
+  surfSheet.classList.remove('open');
+  surfPickerOpen = false;
+  currentSurfType = null;
+  currentSurfId = null;
+}
+
+// ── Inventory + button ─────────────────────────────────────────────────────
+const invAddBtn = document.getElementById('inv-add');
+console.log('Bouton + trouvé:', invAddBtn); // Debug
+
+invAddBtn.addEventListener('touchend', function(e){
+  console.log('Touchend sur bouton +'); // Debug
+  e.preventDefault(); e.stopPropagation();
+  toRN({type:'openCatalogue'});
+});
+
+invAddBtn.addEventListener('click', function(e){
+  console.log('Click sur bouton +'); // Debug
+  e.preventDefault(); e.stopPropagation();
+  toRN({type:'openCatalogue'});
+});
+
 // ── pointerdown capture : bloque OrbitControls AVANT qu'il reçoive l'event ──
 canvas.addEventListener('pointerdown', e=>{
+  // Vérifier si le clic est sur le bouton +
+  const invAddBtn = document.getElementById('inv-add');
+  const rect = invAddBtn.getBoundingClientRect();
+  const isOnButton = e.clientX >= rect.left && e.clientX <= rect.right &&
+                     e.clientY >= rect.top && e.clientY <= rect.bottom;
+
+  if(isOnButton) return; // Laisser le bouton gérer l'événement
+
   if(e.clientY > innerHeight - INV_H) return;
   raycaster.setFromCamera(ndcOf(e.clientX, e.clientY), camera);
   const hits = raycaster.intersectObjects(Object.values(FURN).map(f=>f.root), true);
@@ -304,6 +653,15 @@ canvas.addEventListener('pointerdown', e=>{
 canvas.addEventListener('touchstart', e=>{
   e.preventDefault();
   const t=e.touches[0];
+
+  // Vérifier si le touch est sur le bouton +
+  const invAddBtn = document.getElementById('inv-add');
+  const rect = invAddBtn.getBoundingClientRect();
+  const isOnButton = t.clientX >= rect.left && t.clientX <= rect.right &&
+                     t.clientY >= rect.top && t.clientY <= rect.bottom;
+
+  if(isOnButton) return; // Laisser le bouton gérer l'événement
+
   if(t.clientY > innerHeight - INV_H){ controls.enabled=false; return; }
   t0={x:t.clientX,y:t.clientY,ms:Date.now()};
   tlast={x:t.clientX,y:t.clientY};
@@ -339,27 +697,48 @@ canvas.addEventListener('touchmove', e=>{
 canvas.addEventListener('touchend', e=>{
   e.preventDefault();
   controls.enabled=true;
+
   if(!modelTouched){
     const dx=tlast.x-t0.x, dy=tlast.y-t0.y;
-    if(Math.hypot(dx,dy)<10 && Date.now()-t0.ms<350) selectFurniture(null);
+    const isTap = Math.hypot(dx,dy)<10 && Date.now()-t0.ms<350;
+
+    if(isTap){
+      // Vérifie si tap sur mur ou sol → surface picker
+      raycaster.setFromCamera(ndcOf(tlast.x, tlast.y), camera);
+      const surfHits = raycaster.intersectObjects([floor, walls.back, walls.left, walls.right], false);
+      if(surfHits.length > 0){
+        const hitObj = surfHits[0].object;
+        const type = hitObj.userData.surfType;
+        const surfId = hitObj.userData.wallId || null;
+        if(surfPickerOpen && currentSurfType === type && currentSurfId === surfId){
+          // 2e tap sur même surface → ferme
+          closeSurfPicker();
+        } else {
+          openSurfPicker(type, surfId);
+        }
+      } else {
+        // Tap dans le vide → désélectionne tout
+        selectFurniture(null);
+        closeSurfPicker();
+      }
+    }
   }
+
   if(selectedId && dragStarted) notifyPos(selectedId);
   modelTouched=false; dragStarted=false;
 },{passive:false});
 
 // ── Inventaire ─────────────────────────────────────────────────────────────
-function refreshSlotW(){
-  SLOT_W = 110;
-}
+function refreshSlotW(){ SLOT_W = 110; }
 
 function rebuildInvLabels(){
   const el = document.getElementById('inv-labels');
   el.innerHTML = '';
-  INV_ITEMS.forEach(item => {
+  INV_ITEMS.forEach(function(item){
     const d = document.createElement('div');
     d.className = 'slot-lbl' + (item.placed ? ' placed' : '');
     d.style.width = SLOT_W + 'px';
-    d.innerHTML = \`<span class="sh">\${item.placed ? '✓' : '+'}</span>\`;
+    d.innerHTML = '<span class="sh">' + (item.placed ? '✓' : '+') + '</span>';
     el.appendChild(d);
   });
 }
@@ -406,7 +785,6 @@ function buildInvScene(modelClone){
   modelClone.position.x = -center.x;
   modelClone.position.z = -center.z;
   modelClone.position.y = -box.min.y;
-
   sc.add(modelClone);
 
   const modelH = box.max.y - box.min.y;
@@ -417,7 +795,7 @@ function buildInvScene(modelClone){
   return {scene: sc, camera: cam, model: modelClone};
 }
 
-function placeInRoom(idx){
+function placeInRoom(idx, presetX, presetZ, presetRot){
   const item=INV_ITEMS[idx]; if(!item) return;
   if(item.placed && FURN[item.id]){ selectFurniture(item.id); return; }
   const root=item.original.clone(true);
@@ -427,10 +805,14 @@ function placeInRoom(idx){
   if(biggest>0.01) root.scale.multiplyScalar(2.0/biggest);
   const box2=new THREE.Box3().setFromObject(root);
   const yOff=-box2.min.y;
-  root.position.set(
-    snap(clamp(RW/2+(Math.random()-0.5)*1.5,0.3,RW-0.3)), yOff,
-    snap(clamp(RH/2+(Math.random()-0.5)*1.5,0.3,RH-0.3))
-  );
+  const px = (presetX !== undefined && presetX !== null)
+    ? snap(clamp(presetX, 0.3, RW-0.3))
+    : snap(clamp(RW/2+(Math.random()-0.5)*1.5, 0.3, RW-0.3));
+  const pz = (presetZ !== undefined && presetZ !== null)
+    ? snap(clamp(presetZ, 0.3, RH-0.3))
+    : snap(clamp(RH/2+(Math.random()-0.5)*1.5, 0.3, RH-0.3));
+  root.position.set(px, yOff, pz);
+  if(presetRot !== undefined && presetRot !== null) root.rotation.y = presetRot;
   root.traverse(c=>{ if(c.isMesh){c.castShadow=true;c.receiveShadow=true;} });
   FURN[item.id]={root,name:item.name,yOff};
   scene.add(root);
@@ -441,7 +823,7 @@ function placeInRoom(idx){
   notifyPos(item.id);
 }
 
-// Touch inventaire : scroll natif (passive:true) + détection tap
+// Touch inventaire : scroll natif + détection tap
 const invEl = document.getElementById('inventory');
 let invT0 = {x:0, y:0, ms:0};
 
@@ -464,7 +846,7 @@ invEl.addEventListener('touchend', e=>{
 },{passive:true});
 
 // ── API publique ────────────────────────────────────────────────────────────
-window.addInventoryItem = function(id,name,b64,width,depth){
+window.addInventoryItem = function(id,name,b64,width,depth,presetX,presetZ,presetRot){
   const bin=atob(b64), buf=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
   loader.parse(buf.buffer,'',
@@ -474,6 +856,9 @@ window.addInventoryItem = function(id,name,b64,width,depth){
       INV_ITEMS.push({id,name,width,depth,original,placed:false,...invData});
       loadedN++;
       showInventoryBar();
+      if(presetX !== undefined && presetX !== null){
+        placeInRoom(INV_ITEMS.length - 1, presetX, presetZ, presetRot);
+      }
       if(loadedN>=expectedN) toRN({type:'allItemsReady'});
       toRN({type:'itemReady',id});
     },
@@ -556,6 +941,9 @@ window.addEventListener('resize',()=>{
 });
 
 overlay.classList.add('hidden');
+// Afficher le bouton + en permanence pour accéder au catalogue
+invAddBtn.classList.add('show');
+console.log('Classe show ajoutée au bouton +'); // Debug
 setTimeout(()=>toRN({type:'ready'}),300);
 </script>
 </body>

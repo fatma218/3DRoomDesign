@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,16 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { FURNITURE_CATALOG, COLOR_OPTIONS } from "../data/furniture";
 import ModelPreview from "../components/ModelPreview";
 
-export default function CatalogScreen({ navigation }) {
+export default function CatalogScreen({ navigation, route }) {
+  // ── Mode AJOUT (depuis le bouton + de l'éditeur) ──
+  // - mode === "add"  : ajoute des NOUVEAUX meubles à la chambre existante
+  // - sinon            : nouveau design (flux normal Catalog → Editor3D)
+  const isAddMode = route?.params?.mode === "add";
+  const existingItems = route?.params?.existingItems || [];
+  const existingItemIds = existingItems.map((i) => i.id);
+
+  // En mode AJOUT, on commence avec une sélection VIDE
+  // (l'utilisateur ne sélectionne QUE les nouveaux meubles à ajouter)
   const [selectedItems, setSelectedItems] = useState([]);
   const [previewItem, setPreviewItem] = useState(null);
   const [previewColor, setPreviewColor] = useState(null);
@@ -94,11 +103,24 @@ export default function CatalogScreen({ navigation }) {
     if (selectedItems.length === 0) {
       Alert.alert(
         "Aucun meuble sélectionné",
-        "Sélectionne au moins un meuble avant de continuer.",
+        isAddMode
+          ? "Sélectionne au moins un meuble à ajouter."
+          : "Sélectionne au moins un meuble avant de continuer.",
       );
       return;
     }
-    navigation.navigate("Editor3D", { selectedItems });
+    if (isAddMode) {
+      // Mode AJOUT : on passe la LISTE COMPLÈTE (existing + new)
+      // → Editor3D recevra tout, et auto-placera les meubles déjà dans la chambre
+      const existingItems = route?.params?.existingItems || [];
+      const fullList = [...existingItems, ...selectedItems];
+      navigation.navigate("Editor3D", {
+        selectedItems: fullList,
+        _refreshKey: Date.now(), // force le re-render
+      });
+    } else {
+      navigation.navigate("Editor3D", { selectedItems });
+    }
   };
 
   const showVariantSelector =
@@ -117,15 +139,29 @@ export default function CatalogScreen({ navigation }) {
         >
           <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Catalogue</Text>
+        <Text style={styles.title}>{isAddMode ? "Ajouter" : "Catalogue"}</Text>
         <View style={styles.counter}>
           <Text style={styles.counterText}>{selectedItems.length}</Text>
         </View>
       </View>
 
-      <Text style={styles.subtitle}>
-        Sélectionne les meubles pour ta chambre
-      </Text>
+      {isAddMode ? (
+        <View style={styles.addModeBanner}>
+          <MaterialCommunityIcons
+            name="plus-circle"
+            size={14}
+            color="#22c55e"
+          />
+          <Text style={styles.addModeBannerText}>
+            Mode AJOUT · {existingItemIds.length} meuble
+            {existingItemIds.length > 1 ? "s" : ""} déjà dans ta chambre
+          </Text>
+        </View>
+      ) : (
+        <Text style={styles.subtitle}>
+          Sélectionne les meubles pour ta chambre
+        </Text>
+      )}
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.grid}>
         {FURNITURE_CATALOG.map((item) => {
@@ -176,9 +212,15 @@ export default function CatalogScreen({ navigation }) {
           ]}
           onPress={handleContinue}
         >
-          <MaterialCommunityIcons name="arrow-right" size={22} color="#fff" />
+          <MaterialCommunityIcons
+            name={isAddMode ? "plus-circle" : "arrow-right"}
+            size={22}
+            color="#fff"
+          />
           <Text style={styles.continueText}>
-            DESIGNER MA CHAMBRE ({selectedItems.length})
+            {isAddMode
+              ? `AJOUTER À MA CHAMBRE (${selectedItems.length})`
+              : `DESIGNER MA CHAMBRE (${selectedItems.length})`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -324,6 +366,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 20,
     fontSize: 14,
+  },
+  addModeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(34,197,94,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.4)",
+    borderRadius: 12,
+  },
+  addModeBannerText: {
+    color: "#22c55e",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   scroll: { flex: 1 },
   grid: {

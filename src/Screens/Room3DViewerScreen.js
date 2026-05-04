@@ -23,6 +23,12 @@ export default function Room3DViewerScreen({ navigation, route }) {
 
   const loadModel = useCallback(async () => {
     if (!webViewRef.current || !room) return;
+    // Pour les designs sauvegardés (pas de .glb), on saute le chargement
+    // Le placeholder s'affichera à la place
+    if (!room.modelModule) {
+      setModelLoaded(true);
+      return;
+    }
     try {
       const asset = Asset.fromModule(room.modelModule);
       await asset.downloadAsync();
@@ -36,6 +42,8 @@ export default function Room3DViewerScreen({ navigation, route }) {
       Alert.alert("Erreur", "Impossible de charger le modèle 3D");
     }
   }, [room]);
+
+  const isSavedDesign = !room?.modelModule && room?.items;
 
   const handleMessage = (event) => {
     try {
@@ -62,18 +70,35 @@ export default function Room3DViewerScreen({ navigation, route }) {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <WebView
-        ref={webViewRef}
-        source={{ html: getRoomViewerHTML() }}
-        style={styles.webview}
-        onMessage={handleMessage}
-        javaScriptEnabled
-        domStorageEnabled
-        allowFileAccess
-        originWhitelist={["*"]}
-        mixedContentMode="always"
-        scrollEnabled={false}
-      />
+      {/* Pour les rooms .glb : WebView 3D ; pour saved designs : placeholder */}
+      {!isSavedDesign ? (
+        <WebView
+          ref={webViewRef}
+          source={{ html: getRoomViewerHTML() }}
+          style={styles.webview}
+          onMessage={handleMessage}
+          javaScriptEnabled
+          domStorageEnabled
+          allowFileAccess
+          originWhitelist={["*"]}
+          mixedContentMode="always"
+          scrollEnabled={false}
+        />
+      ) : (
+        <View style={styles.savedPreview}>
+          <View style={styles.savedIcon}>
+            <Text style={{ fontSize: 80 }}>🏠</Text>
+          </View>
+          <Text style={styles.savedTitle}>{room.name}</Text>
+          <Text style={styles.savedSubtitle}>
+            Design sauvegardé · {room.items?.length || 0} meuble
+            {(room.items?.length || 0) > 1 ? "s" : ""}
+          </Text>
+          <Text style={styles.savedHint}>
+            Tape "COMMENCER PAR CE MODÈLE" pour l'ouvrir et le modifier
+          </Text>
+        </View>
+      )}
 
       {/* Header floating avec gradient */}
       <LinearGradient
@@ -118,7 +143,7 @@ export default function Room3DViewerScreen({ navigation, route }) {
         </View>
       )}
 
-      {/* Bottom action — TÉLÉCHARGER (à protéger par login plus tard) */}
+      {/* Bottom action — COMMENCER PAR CE MODÈLE */}
       <LinearGradient
         colors={["rgba(26,26,46,0)", "rgba(26,26,46,0.95)"]}
         style={styles.bottomGradient}
@@ -126,16 +151,19 @@ export default function Room3DViewerScreen({ navigation, route }) {
       >
         <TouchableOpacity
           style={styles.downloadBtn}
-          onPress={() =>
-            Alert.alert(
-              "📥 Télécharger",
-              "Le téléchargement nécessitera une connexion (à venir).",
-            )
-          }
+          onPress={() => {
+            // Pour les rooms .glb fusionnées : ouvre l'éditeur vide (l'utilisateur ajoute des meubles)
+            // Pour les designs sauvegardés : ouvre l'éditeur avec les items pré-placés (édition)
+            navigation.navigate("Editor3D", {
+              presetItems: room.items || null,
+              presetRoomMeta: { name: room.name, style: room.style, id: room.id },
+              selectedItems: [],
+            });
+          }}
           activeOpacity={0.85}
         >
-          <MaterialCommunityIcons name="download" size={20} color="#fff" />
-          <Text style={styles.downloadText}>TÉLÉCHARGER</Text>
+          <MaterialCommunityIcons name="brush-variant" size={20} color="#fff" />
+          <Text style={styles.downloadText}>COMMENCER PAR CE MODÈLE</Text>
         </TouchableOpacity>
       </LinearGradient>
     </View>
@@ -189,6 +217,45 @@ const styles = StyleSheet.create({
   },
   loadingText: { color: "#a0a0c0", fontSize: 14, marginTop: 4 },
   loadingHint: { color: "#606080", fontSize: 11, marginTop: 4 },
+
+  savedPreview: {
+    flex: 1,
+    backgroundColor: "#1a1a2e",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 30,
+    gap: 14,
+  },
+  savedIcon: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: "rgba(34,197,94,0.15)",
+    borderWidth: 2,
+    borderColor: "rgba(34,197,94,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  savedTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  savedSubtitle: {
+    color: "#a0a0c0",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  savedHint: {
+    color: "#606080",
+    fontSize: 12,
+    fontStyle: "italic",
+    marginTop: 16,
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
 
   bottomGradient: {
     position: "absolute",

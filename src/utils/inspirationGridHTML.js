@@ -7,7 +7,36 @@ export const getInspirationGridHTML = (cols = 2) => `<!DOCTYPE html>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:100%;height:100%;overflow:hidden;background:#1a1a2e}
     canvas{display:block;touch-action:manipulation}
-    #labels{position:absolute;top:0;left:0;width:100%;pointer-events:none}
+    #cards{position:absolute;top:0;left:0;width:100%;pointer-events:none;z-index:1}
+    #labels{position:absolute;top:0;left:0;width:100%;pointer-events:none;z-index:3}
+    .placeholder-cell{
+      position:absolute;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      pointer-events:none;
+      z-index:2;
+      background:#0a0a1a;
+    }
+    .placeholder-icon{font-size:48px;opacity:0.7}
+    .placeholder-count{
+      color:#a0a0c0;
+      font-family:sans-serif;
+      font-size:11px;
+      font-weight:600;
+      background:rgba(34,197,94,0.18);
+      border:1px solid rgba(34,197,94,0.45);
+      padding:3px 10px;
+      border-radius:10px;
+    }
+    .saved-badge{
+      position:absolute;
+      background:rgba(34,197,94,0.92);
+      color:#fff;font-family:sans-serif;font-size:8px;font-weight:700;
+      padding:3px 7px;border-radius:6px;letter-spacing:0.5px;
+    }
     .style-tag{
       position:absolute;
       background:rgba(15,52,96,0.85);
@@ -33,6 +62,7 @@ export const getInspirationGridHTML = (cols = 2) => `<!DOCTYPE html>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="cards"></div>
 <div id="labels"></div>
 
 <script type="importmap">
@@ -50,6 +80,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const COLS = ${cols};
 const canvas = document.getElementById('c');
+const cardsEl = document.getElementById('cards');
 const labelsEl = document.getElementById('labels');
 
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
@@ -103,6 +134,7 @@ function buildScene(modelClone){
 }
 
 function rebuildLabels(){
+  cardsEl.innerHTML = '';
   labelsEl.innerHTML = '';
   ROOMS.forEach((r, i) => {
     const col = i % COLS;
@@ -110,12 +142,33 @@ function rebuildLabels(){
     const x = col * cellW;
     const y = row * cellH;
 
-    const tag = document.createElement('div');
-    tag.className = 'style-tag';
-    tag.style.left = (x + 8) + 'px';
-    tag.style.top = (y + 8) + 'px';
-    tag.textContent = r.style.toUpperCase();
-    labelsEl.appendChild(tag);
+    // ── Placeholder pour designs sauvegardés (pas de .glb) ─────────────
+    if (r.isPlaceholder) {
+      const ph = document.createElement('div');
+      ph.className = 'placeholder-cell';
+      ph.style.left = x + 'px';
+      ph.style.top = y + 'px';
+      ph.style.width = cellW + 'px';
+      ph.style.height = cellH + 'px';
+      ph.innerHTML = '<div class="placeholder-icon">🏠</div>' +
+        '<div class="placeholder-count">' + r.itemCount + ' meuble' + (r.itemCount > 1 ? 's' : '') + '</div>';
+      cardsEl.appendChild(ph);
+
+      const savedBadge = document.createElement('div');
+      savedBadge.className = 'saved-badge';
+      savedBadge.style.left = (x + 8) + 'px';
+      savedBadge.style.top = (y + 8) + 'px';
+      savedBadge.textContent = '💾 SAUVEGARDÉ';
+      labelsEl.appendChild(savedBadge);
+    } else {
+      // Style tag normal
+      const tag = document.createElement('div');
+      tag.className = 'style-tag';
+      tag.style.left = (x + 8) + 'px';
+      tag.style.top = (y + 8) + 'px';
+      tag.textContent = r.style.toUpperCase();
+      labelsEl.appendChild(tag);
+    }
 
     const likes = document.createElement('div');
     likes.className = 'lbl-likes';
@@ -151,7 +204,7 @@ window.addRoomThumbnail = function(id, b64, name, likes, style){
     loader.parse(buf.buffer, '',
       gltf => {
         const sc = buildScene(gltf.scene);
-        ROOMS.push({id, name, likes, style, ...sc});
+        ROOMS.push({id, name, likes, style, isPlaceholder:false, ...sc});
         resizeCanvas();
         toRN({type:'roomThumbnailReady', id});
       },
@@ -162,17 +215,32 @@ window.addRoomThumbnail = function(id, b64, name, likes, style){
   }
 };
 
+// Pour les designs sauvegardés (sans .glb) → placeholder visuel
+window.addPlaceholderThumbnail = function(id, name, likes, style, itemCount){
+  ROOMS.push({
+    id, name, likes, style,
+    isPlaceholder: true,
+    itemCount: itemCount || 0,
+    scene: null, camera: null, model: null,
+  });
+  resizeCanvas();
+  toRN({type:'roomThumbnailReady', id});
+};
+
 window.clearAllRooms = function(){
   ROOMS.forEach(r => {
-    r.scene.traverse(o => {
-      if(o.geometry) o.geometry.dispose();
-      if(o.material){
-        if(Array.isArray(o.material)) o.material.forEach(m => m.dispose());
-        else o.material.dispose();
-      }
-    });
+    if (r.scene) {
+      r.scene.traverse(o => {
+        if(o.geometry) o.geometry.dispose();
+        if(o.material){
+          if(Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+          else o.material.dispose();
+        }
+      });
+    }
   });
   ROOMS.length = 0;
+  cardsEl.innerHTML = '';
   labelsEl.innerHTML = '';
   resizeCanvas();
 };
@@ -210,11 +278,12 @@ function animate(){
     renderer.setScissorTest(true);
     const totalH = Math.ceil(ROOMS.length / COLS) * cellH;
     ROOMS.forEach((r, i) => {
+      // Skip placeholders (designs sauvegardés sans .glb)
+      if (r.isPlaceholder || !r.scene) return;
       const col = i % COLS;
       const row = Math.floor(i / COLS);
       const x = col * cellW;
       const yFromBottom = totalH - (row + 1) * cellH;
-      //r.model.rotation.y += 0.005;
       renderer.setViewport(x, yFromBottom, cellW, cellH);
       renderer.setScissor(x, yFromBottom, cellW, cellH);
       renderer.setClearColor(0x0a0a1a, 1);

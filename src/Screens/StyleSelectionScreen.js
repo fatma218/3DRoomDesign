@@ -15,7 +15,7 @@ const STYLES = [
   {
     id: "classic",
     name: "CLASSIQUE",
-    icon: "armchair",
+    icon: "sofa",
     description: "Élégance intemporelle, bois & textiles chauds",
     accent: "#c8a97e",
     available: false,

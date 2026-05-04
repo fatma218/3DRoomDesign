@@ -49,6 +49,6 @@ export const INSPIRATION_ROOMS = [
 export const STYLE_FILTERS = [
   { id: "all", label: "Tout", icon: "view-grid" },
   { id: "gamer", label: "Gamer", icon: "gamepad-variant" },
-  { id: "classic", label: "Classique", icon: "armchair" },
+  { id: "classic", label: "Classique", icon: "sofa" },
   { id: "modern", label: "Moderne", icon: "cube-outline" },
 ];

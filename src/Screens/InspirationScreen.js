@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,10 @@ import { Asset } from "expo-asset";
 import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { INSPIRATION_ROOMS, STYLE_FILTERS } from "../data/inspirationRooms";
 import { getInspirationGridHTML } from "../utils/inspirationGridHTML";
+import { listSavedDesigns } from "../utils/savedDesigns";
 
 const { width } = Dimensions.get("window");
 const COLS = 2;
@@ -25,15 +27,32 @@ export default function InspirationScreen({ navigation }) {
   const [filter, setFilter] = useState("all");
   const [webviewReady, setWebviewReady] = useState(false);
   const [loadedCount, setLoadedCount] = useState(0);
+  const [savedDesigns, setSavedDesigns] = useState([]);
   const webViewRef = useRef(null);
 
-  const filteredRooms = INSPIRATION_ROOMS.filter(
+  // Recharge les designs sauvegardés à chaque entrée dans l'écran
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      (async () => {
+        const saved = await listSavedDesigns();
+        if (mounted) setSavedDesigns(saved);
+      })();
+      return () => {
+        mounted = false;
+      };
+    }, []),
+  );
+
+  // Combine rooms par défaut + designs sauvegardés
+  const allRooms = [...INSPIRATION_ROOMS, ...savedDesigns];
+  const filteredRooms = allRooms.filter(
     (r) => filter === "all" || r.style === filter,
   );
   const rows = Math.max(1, Math.ceil(filteredRooms.length / COLS));
   const webViewHeight = rows * CELL;
 
-  // Charge / recharge les modèles dans la WebView quand le filtre change
+  // Charge les modèles dans la WebView quand le filtre change ou les designs changent
   useEffect(() => {
     if (!webviewReady) return;
     let cancelled = false;
@@ -43,13 +62,31 @@ export default function InspirationScreen({ navigation }) {
       webViewRef.current.injectJavaScript(`window.clearAllRooms(); true;`);
       setLoadedCount(0);
 
-      const rooms = INSPIRATION_ROOMS.filter(
+      const rooms = allRooms.filter(
         (r) => filter === "all" || r.style === filter,
       );
 
       for (const room of rooms) {
         if (cancelled) return;
         try {
+          // Designs sauvegardés (sans .glb) → placeholder
+          if (!room.modelModule) {
+            const code =
+              `window.addPlaceholderThumbnail(` +
+              JSON.stringify(room.id) +
+              "," +
+              JSON.stringify(room.name) +
+              "," +
+              (room.likes || 0) +
+              "," +
+              JSON.stringify(room.style) +
+              "," +
+              (room.items?.length || 0) +
+              `); true;`;
+            webViewRef.current?.injectJavaScript(code);
+            continue;
+          }
+          // Rooms .glb → charge le modèle 3D
           const asset = Asset.fromModule(room.modelModule);
           await asset.downloadAsync();
           const base64 = await FileSystem.readAsStringAsync(asset.localUri, {
@@ -63,7 +100,7 @@ export default function InspirationScreen({ navigation }) {
             "," +
             JSON.stringify(room.name) +
             "," +
-            room.likes +
+            (room.likes || 0) +
             "," +
             JSON.stringify(room.style) +
             `); true;`;
@@ -78,7 +115,7 @@ export default function InspirationScreen({ navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [filter, webviewReady]);
+  }, [filter, webviewReady, savedDesigns]);
 
   const handleMessage = (event) => {
     try {
@@ -88,7 +125,7 @@ export default function InspirationScreen({ navigation }) {
       } else if (data.type === "roomThumbnailReady") {
         setLoadedCount((c) => c + 1);
       } else if (data.type === "roomTapped") {
-        const room = INSPIRATION_ROOMS.find((r) => r.id === data.id);
+        const room = allRooms.find((r) => r.id === data.id);
         if (room) navigation.navigate("Room3DViewer", { room });
       } else if (data.type === "error") {
         console.error("WebView 3D error:", data.message);
@@ -120,10 +157,45 @@ export default function InspirationScreen({ navigation }) {
           <Text style={styles.title}>Inspiration</Text>
           <Text style={styles.subtitle}>
             {filteredRooms.length} chambre{filteredRooms.length > 1 ? "s" : ""}
+            {savedDesigns.length > 0 &&
+              ` · ${savedDesigns.length} sauvée${savedDesigns.length > 1 ? "s" : ""}`}
           </Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
+
+      {/* Filtres */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filtersRow}
+      >
+        {STYLE_FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.id}
+            style={[
+              styles.filterChip,
+              filter === f.id && styles.filterChipActive,
+            ]}
+            onPress={() => setFilter(f.id)}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons
+              name={f.icon}
+              size={14}
+              color={filter === f.id ? "#fff" : "#a0a0c0"}
+            />
+            <Text
+              style={[
+                styles.filterText,
+                filter === f.id && styles.filterTextActive,
+              ]}
+            >
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {/* Loading badge */}
       {isLoading && webviewReady && (
@@ -141,20 +213,35 @@ export default function InspirationScreen({ navigation }) {
         contentContainerStyle={{ paddingBottom: 30 }}
         showsVerticalScrollIndicator={false}
       >
-        <WebView
-          ref={webViewRef}
-          source={{ html: getInspirationGridHTML(COLS) }}
-          style={{ width, height: webViewHeight }}
-          onMessage={handleMessage}
-          javaScriptEnabled
-          domStorageEnabled
-          allowFileAccess
-          originWhitelist={["*"]}
-          mixedContentMode="always"
-          scrollEnabled={false}
-        />
+        {filteredRooms.length === 0 ? (
+          <View style={styles.emptyState}>
+            <MaterialCommunityIcons
+              name="image-off-outline"
+              size={48}
+              color="#606080"
+            />
+            <Text style={styles.emptyText}>Aucune chambre</Text>
+            <Text style={styles.emptySubtext}>
+              {filter === "all"
+                ? "Crée ton premier design en tapant 'Design my room' sur l'accueil !"
+                : "Aucun modèle dans ce style. Essaie un autre filtre."}
+            </Text>
+          </View>
+        ) : (
+          <WebView
+            ref={webViewRef}
+            source={{ html: getInspirationGridHTML(COLS) }}
+            style={{ width, height: webViewHeight }}
+            onMessage={handleMessage}
+            javaScriptEnabled
+            domStorageEnabled
+            allowFileAccess
+            originWhitelist={["*"]}
+            mixedContentMode="always"
+            scrollEnabled={false}
+          />
+        )}
 
-        {/* Hint en bas */}
         <View style={styles.hint}>
           <MaterialCommunityIcons
             name="hand-pointing-up"
@@ -224,6 +311,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   loadingText: { color: "#fff", fontSize: 12 },
+
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+    gap: 8,
+  },
+  emptyText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 12,
+  },
+  emptySubtext: {
+    color: "#a0a0c0",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 18,
+  },
 
   hint: {
     flexDirection: "row",
