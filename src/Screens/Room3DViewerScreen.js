@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,31 @@ import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { getRoomViewerHTML } from "../utils/roomViewerHTML";
+import { useAuth } from "../context/AuthContext";
+import { isRoomLiked, toggleRoomLike } from "../utils/likedRooms";
 
 export default function Room3DViewerScreen({ navigation, route }) {
+  const { requireAuth } = useAuth();
   const room = route.params?.room;
   const webViewRef = useRef(null);
   const [modelLoaded, setModelLoaded] = useState(false);
   const [liked, setLiked] = useState(false);
+
+  // ⭐ Charge l'état "liked" depuis AsyncStorage au mount
+  useEffect(() => {
+    if (!room?.id) return;
+    (async () => {
+      const isLiked = await isRoomLiked(room.id);
+      setLiked(isLiked);
+    })();
+  }, [room?.id]);
+
+  // ⭐ Toggle persistant
+  const handleToggleLike = async () => {
+    if (!room?.id) return;
+    const newLiked = await toggleRoomLike(room.id);
+    setLiked(newLiked);
+  };
 
   const loadModel = useCallback(async () => {
     if (!webViewRef.current || !room) return;
@@ -107,21 +126,31 @@ export default function Room3DViewerScreen({ navigation, route }) {
         pointerEvents="box-none"
       >
         <View style={styles.header}>
+          {/* ← Bouton retour (gauche) */}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={() => navigation.goBack()}
           >
             <MaterialCommunityIcons name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
+
+          {/* Titre centré */}
           <View style={{ flex: 1, alignItems: "center" }}>
             <Text style={styles.title} numberOfLines={1}>
               {room.name}
             </Text>
             <Text style={styles.subtitle}>{room.style.toUpperCase()}</Text>
           </View>
+
+          {/* ❤️ Bouton like (droite) — protégé par requireAuth + persistant */}
           <TouchableOpacity
             style={styles.iconBtn}
-            onPress={() => setLiked(!liked)}
+            onPress={() =>
+              requireAuth(
+                handleToggleLike,
+                "Connecte-toi pour liker des chambres",
+              )
+            }
           >
             <MaterialCommunityIcons
               name={liked ? "heart" : "heart-outline"}
@@ -151,15 +180,19 @@ export default function Room3DViewerScreen({ navigation, route }) {
       >
         <TouchableOpacity
           style={styles.downloadBtn}
-          onPress={() => {
-            // Pour les rooms .glb fusionnées : ouvre l'éditeur vide (l'utilisateur ajoute des meubles)
-            // Pour les designs sauvegardés : ouvre l'éditeur avec les items pré-placés (édition)
-            navigation.navigate("Editor3D", {
-              presetItems: room.items || null,
-              presetRoomMeta: { name: room.name, style: room.style, id: room.id },
-              selectedItems: [],
-            });
-          }}
+          onPress={() =>
+            requireAuth(() => {
+              navigation.navigate("Editor3D", {
+                presetItems: room.items || null,
+                presetRoomMeta: {
+                  name: room.name,
+                  style: room.style,
+                  id: room.id,
+                  surfaces: room.surfaces || null,
+                },
+              });
+            }, "Connecte-toi pour personnaliser ce modèle")
+          }
           activeOpacity={0.85}
         >
           <MaterialCommunityIcons name="brush-variant" size={20} color="#fff" />

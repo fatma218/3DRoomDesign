@@ -392,54 +392,66 @@ fill.position.set(-4, 6, -4);
 scene.add(fill);
 
 // ── Sol ────────────────────────────────────────────────────────────────────
+const FLOOR_THICKNESS = 0.02;  // 8 cm d'épaisseur
 const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(RW, RH),
-  new THREE.MeshLambertMaterial({color:0xf2e4c8})
+  new THREE.BoxGeometry(RW, FLOOR_THICKNESS, RH),
+  new THREE.MeshLambertMaterial({ color: 0xf2e4c8 })
 );
-floor.rotation.x = -Math.PI/2;
-floor.position.set(RW/2, 0, RH/2);
+// Position : la face SUPÉRIEURE du sol reste à y=0 (les meubles ne bougent pas)
+floor.position.set(RW/2, -FLOOR_THICKNESS/2, RH/2);
 floor.receiveShadow = true;
-floor.userData.surfType = 'floor';
+floor.userData.surfType = 'floor'; // pour le surface picker
 scene.add(floor);
 
-// ── Grille ─────────────────────────────────────────────────────────────────
-const grid = new THREE.GridHelper(Math.max(RW,RH)*3, Math.max(RW,RH)*12, 0x888888, 0xbbbbbb);
-grid.position.set(RW/2, 0.004, RH/2);
-grid.material.opacity = 0.35;
-grid.material.transparent = true;
-scene.add(grid);
+// // ── Grille ─────────────────────────────────────────────────────────────────
+// const grid = new THREE.GridHelper(Math.max(RW,RH)*3, Math.max(RW,RH)*12, 0x888888, 0xbbbbbb);
+// grid.position.set(RW/2, 0.004, RH/2);
+// grid.material.opacity = 0.05;
+// grid.material.transparent = true;
+// scene.add(grid);
 
 // ── Murs ───────────────────────────────────────────────────────────────────
-const WH = 3.2;
+const WH = 3.2;                  // hauteur des murs (3.2m)
+const WALL_THICKNESS = 0.08;     // 8 cm d'épaisseur (sensation de mur réel)
 const walls = {}; // ← {back, left, right}
-const wallColors = {back: 0xece0ce, left: 0xece0ce, right: 0xece0ce};
+const wallColors = { back: 0xece0ce, left: 0xece0ce, right: 0xece0ce };
 
 const wallMat = () => new THREE.MeshLambertMaterial({
-  color:0xece0ce, side:THREE.FrontSide, transparent:true, opacity:0.88
+  color: 0xece0ce,
+  side: THREE.DoubleSide,  // visible des 2 côtés (utile quand la caméra tourne autour)
 });
 
-function addWall(id, w,h,x,y,z,ry){
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h), wallMat());
-  m.position.set(x,y,z);
-  m.rotation.y = ry;
+// Helper : crée un mur avec une géométrie box et une position précise
+function addWall(id, geom, position) {
+  const m = new THREE.Mesh(geom, wallMat());
+  m.position.copy(position);
   m.userData.surfType = 'wall';
   m.userData.wallId = id;
+  m.receiveShadow = true;
   scene.add(m);
   walls[id] = m;
 }
-addWall('back', RW, WH, RW/2, WH/2, 0,        0);
-addWall('left', RH, WH, 0,   WH/2, RH/2,  Math.PI/2);
-addWall('right', RH, WH, RW,  WH/2, RH/2, -Math.PI/2);
 
-const lineMat = new THREE.LineBasicMaterial({color:0xb89a6a});
-function addLine(pts){
-  scene.add(new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(...p))),
-    lineMat
-  ));
-}
-addLine([[0,0,0],[RW,0,0]]); addLine([[0,0,0],[0,0,RH]]);
-addLine([[RW,0,0],[RW,0,RH]]); addLine([[0,0,RH],[RW,0,RH]]);
+// Mur arrière : épaisseur dans Z, face intérieure à z=0
+addWall(
+  'back',
+  new THREE.BoxGeometry(RW, WH, WALL_THICKNESS),
+  new THREE.Vector3(RW/2, WH/2, -WALL_THICKNESS/2)
+);
+
+// Mur gauche : épaisseur dans X, face intérieure à x=0
+addWall(
+  'left',
+  new THREE.BoxGeometry(WALL_THICKNESS, WH, RH),
+  new THREE.Vector3(-WALL_THICKNESS/2, WH/2, RH/2)
+);
+
+// Mur droit : épaisseur dans X, face intérieure à x=RW
+addWall(
+  'right',
+  new THREE.BoxGeometry(WALL_THICKNESS, WH, RH),
+  new THREE.Vector3(RW + WALL_THICKNESS/2, WH/2, RH/2)
+);
 
 // ── État furniture ─────────────────────────────────────────────────────────
 const FURN      = {};
@@ -884,6 +896,47 @@ window.clearAll = function(){
   for(const k in FURN) delete FURN[k];
   INV_ITEMS.forEach(i=>i.placed=false);
   rebuildInvLabels(); selectFurniture(null);
+};
+
+// ── API : récupérer l'état des surfaces (pour SAVE) ──
+window.getSurfacesState = function(){
+  try {
+    return JSON.stringify({
+      walls: {
+        back:  '#' + wallColors.back.toString(16).padStart(6,'0'),
+        left:  '#' + wallColors.left.toString(16).padStart(6,'0'),
+        right: '#' + wallColors.right.toString(16).padStart(6,'0'),
+      },
+      floor: '#' + floor.material.color.getHex().toString(16).padStart(6,'0'),
+      activeWallPresetId,
+      activeFloorPresetId,
+    });
+  } catch(e){ return '{}'; }
+};
+
+// ── API : restaurer l'état des surfaces (pour LOAD saved design) ──
+window.setSurfacesState = function(stateJsonOrObj){
+  try {
+    const state = typeof stateJsonOrObj === 'string' ? JSON.parse(stateJsonOrObj) : stateJsonOrObj;
+    if (!state) return;
+    if (state.walls){
+      ['back','left','right'].forEach(function(id){
+        if (state.walls[id] && walls[id]){
+          const hex = parseInt(state.walls[id].replace('#',''), 16);
+          walls[id].material.color.setHex(hex);
+          walls[id].material.needsUpdate = true;
+          wallColors[id] = hex;
+        }
+      });
+    }
+    if (state.floor){
+      const hex = parseInt(state.floor.replace('#',''), 16);
+      floor.material.color.setHex(hex);
+      floor.material.needsUpdate = true;
+    }
+    if (state.activeWallPresetId)  activeWallPresetId  = state.activeWallPresetId;
+    if (state.activeFloorPresetId) activeFloorPresetId = state.activeFloorPresetId;
+  } catch(e){ console.error('setSurfacesState error', e); }
 };
 
 window.setCameraIso   = ()=>{ camera.position.set(RW/2,7,RH+3); controls.target.set(RW/2,0,RH/2); controls.update(); };

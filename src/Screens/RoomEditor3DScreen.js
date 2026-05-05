@@ -26,7 +26,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRoom } from "../context/RoomContext";
 import { saveToCloud } from "../utils/cloudSync";
 import { getEditorHTML } from "../utils/editorHTML";
-import { saveDesign } from "../utils/savedDesigns";
+import { saveDesign, updateDesign } from "../utils/savedDesigns";
+import { useAuth } from "../context/AuthContext";
 
 const ROOM_W = 5;
 const ROOM_H = 5;
@@ -39,6 +40,7 @@ const STYLE_OPTIONS = [
 
 export default function RoomEditor3DScreen({ navigation, route }) {
   const { items, addItemDirect, removeItem, updateItem, clearRoom } = useRoom();
+  const { requireAuth } = useAuth();
   // console.log(
   //   "🟢 [Editor3D] MOUNT — params:",
   //   JSON.stringify({
@@ -62,6 +64,18 @@ export default function RoomEditor3DScreen({ navigation, route }) {
   const itemsToLoadRef = useRef(itemsToLoad);
   // Track item IDs already injected into WebView inventory (évite les doublons)
   const loadedItemIdsRef = useRef(new Set());
+  // ── Surfaces (murs + sol) — état trackée pour le SAVE ──
+  const surfacesRef = useRef({
+    walls: { back: "#ece0ce", left: "#ece0ce", right: "#ece0ce" },
+    floor: "#f2e4c8",
+  });
+  // ── État "design modifié depuis le dernier SAVE" ──
+  const [hasChanges, setHasChanges] = useState(false);
+  // Pour ignorer les events lors du chargement initial
+  const initialLoadDoneRef = useRef(false);
+  // Saved id (si on édite un design existant)
+  const editingDesignIdRef = useRef(presetRoomMeta?.id || null);
+
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
@@ -82,6 +96,10 @@ export default function RoomEditor3DScreen({ navigation, route }) {
   const [saveStyle, setSaveStyle] = useState("gamer");
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccessId, setSaveSuccessId] = useState(null); // id du design fraichement sauvé
+
+  // ── Modal QUIT confirm (avant de retourner home) ──
+  const [showQuitModal, setShowQuitModal] = useState(false);
 
   const editorHTML = useMemo(() => getEditorHTML(ROOM_W, ROOM_H), []);
 
@@ -201,12 +219,16 @@ export default function RoomEditor3DScreen({ navigation, route }) {
         const data = JSON.parse(event.nativeEvent.data);
         switch (data.type) {
           case "ready":
-            // console.log(
-            //   "🔵 [Editor3D] WEBVIEW READY — itemsToLoad:",
-            //   itemsToLoad.length,
-            // );
             setWebviewReady(true);
             loadInventoryItems();
+            // ⭐ Restaurer les surfaces si on édite un saved design
+            if (presetRoomMeta?.surfaces && webViewRef.current) {
+              const surfStr = JSON.stringify(presetRoomMeta.surfaces);
+              webViewRef.current.injectJavaScript(
+                `window.setSurfacesState(${JSON.stringify(surfStr)}); true;`,
+              );
+              surfacesRef.current = presetRoomMeta.surfaces;
+            }
             break;
 
           case "itemReady":
@@ -214,10 +236,12 @@ export default function RoomEditor3DScreen({ navigation, route }) {
             break;
 
           case "allItemsReady":
+            // Le chargement initial est terminé → on peut tracker les modifs
+            initialLoadDoneRef.current = true;
+            setHasChanges(false);
             break;
 
           case "modelAdded": {
-            // Cherche dans itemsToLoad (selectedItems ou presetItems)
             const sel = itemsToLoadRef.current.find((s) => s.id === data.id);
             if (sel && !itemsRef.current.find((i) => i.id === data.id)) {
               addItemDirect({
@@ -225,6 +249,8 @@ export default function RoomEditor3DScreen({ navigation, route }) {
                 position: [ROOM_W / 2, ROOM_H / 2],
                 rotation: 0,
               });
+              // Marquer dirty seulement après load initial
+              if (initialLoadDoneRef.current) setHasChanges(true);
             }
             break;
           }
@@ -234,10 +260,35 @@ export default function RoomEditor3DScreen({ navigation, route }) {
               position: [data.x, data.z],
               rotation: ((data.rotation * 180) / Math.PI + 360) % 360,
             });
+            if (initialLoadDoneRef.current) setHasChanges(true);
             break;
 
           case "deleteItem":
             removeItem(data.id);
+            if (initialLoadDoneRef.current) setHasChanges(true);
+            break;
+
+          case "wallColorChanged": {
+            // Mettre à jour le ref local
+            if (data.wallId) {
+              surfacesRef.current = {
+                ...surfacesRef.current,
+                walls: {
+                  ...surfacesRef.current.walls,
+                  [data.wallId]: data.color,
+                },
+              };
+            }
+            if (initialLoadDoneRef.current) setHasChanges(true);
+            break;
+          }
+
+          case "floorColorChanged":
+            surfacesRef.current = {
+              ...surfacesRef.current,
+              floor: data.color,
+            };
+            if (initialLoadDoneRef.current) setHasChanges(true);
             break;
 
           case "openCatalogue":
@@ -341,37 +392,72 @@ export default function RoomEditor3DScreen({ navigation, route }) {
       );
       return;
     }
-    // Pré-remplir avec les infos du design original si on en édite un
-    setSaveName(presetRoomMeta?.name ? presetRoomMeta.name + " (modifié)" : "");
+    setSaveName(presetRoomMeta?.name || "");
     setSaveStyle(presetRoomMeta?.style || "gamer");
     setSaveSuccess(false);
+    setSaveSuccessId(null);
     setShowSaveModal(true);
   };
 
-  const handleSaveDesign = async () => {
+  // saveMode peut être "update" (écrase l'existant) ou "new" (nouvelle copie)
+  const handleSaveDesign = async (saveMode = "new") => {
     if (!saveName.trim()) {
       Alert.alert("Nom manquant", "Donne un nom à ton design.");
       return;
     }
     setIsSaving(true);
     try {
-      // On enregistre les items COMPLETS (avec variantModule, position, rotation, etc.)
-      await saveDesign({
+      const designData = {
         name: saveName.trim(),
         style: saveStyle,
         items: itemsRef.current,
         roomSize: { width: ROOM_W, depth: ROOM_H },
-      });
+        surfaces: surfacesRef.current, // ⭐ inclut murs + sol
+      };
+
+      let savedId;
+      if (saveMode === "update" && editingDesignIdRef.current) {
+        // Update : écrase le design existant
+        const updated = await updateDesign(
+          editingDesignIdRef.current,
+          designData,
+        );
+        savedId = updated.id;
+      } else {
+        // New : nouvelle copie
+        const newDesign = await saveDesign(designData);
+        savedId = newDesign.id;
+        // L'editor pointe maintenant sur ce nouveau design
+        editingDesignIdRef.current = savedId;
+      }
+
+      setHasChanges(false); // reset dirty state
       setSaveSuccess(true);
-      setTimeout(() => {
-        setShowSaveModal(false);
-        setSaveSuccess(false);
-      }, 1400);
+      setSaveSuccessId(savedId);
     } catch (e) {
       Alert.alert("Erreur", "Impossible d'enregistrer : " + e.message);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // ── QUIT : retour Home avec confirm si modifs non sauvées ──
+  const handleHomePress = () => {
+    if (!hasChanges) {
+      navigation.navigate("Home");
+      return;
+    }
+    setShowQuitModal(true);
+  };
+
+  const handleQuitWithoutSave = () => {
+    setShowQuitModal(false);
+    navigation.navigate("Home");
+  };
+
+  const handleSaveThenQuit = () => {
+    setShowQuitModal(false);
+    handleOpenSaveModal();
   };
 
   // ── FINALIZE (cloud sync) ─────────────────────────────────────
@@ -410,21 +496,30 @@ export default function RoomEditor3DScreen({ navigation, route }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.iconBtn}
-        >
-          <Text style={styles.backArrow}>←</Text>
+        <TouchableOpacity onPress={handleHomePress} style={styles.iconBtn}>
+          <MaterialCommunityIcons
+            name="home-outline"
+            size={22}
+            color="#e94560"
+          />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {presetRoomMeta?.name || "Ma Chambre 3D"}
-        </Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title} numberOfLines={1}>
+            {presetRoomMeta?.name || "Ma Chambre 3D"}
+          </Text>
+          {hasChanges && <View style={styles.dirtyDot} />}
+        </View>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleReset} style={styles.iconBtn}>
             <MaterialCommunityIcons name="refresh" size={20} color="#606080" />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={handleOpenSaveModal}
+            onPress={() =>
+              requireAuth(
+                handleOpenSaveModal,
+                "Connecte-toi pour sauvegarder ton design",
+              )
+            }
             style={[styles.saveBtn, items.length === 0 && styles.disabled]}
             activeOpacity={0.85}
           >
@@ -510,8 +605,38 @@ export default function RoomEditor3DScreen({ navigation, route }) {
                 </View>
                 <Text style={styles.successTitle}>Design enregistré !</Text>
                 <Text style={styles.successSubtitle}>
-                  Retrouve-le dans Inspiration
+                  Retrouve-le dans Mes Designs
                 </Text>
+                <View style={styles.successActions}>
+                  <TouchableOpacity
+                    style={styles.successBtnSecondary}
+                    onPress={() => {
+                      setShowSaveModal(false);
+                      setSaveSuccess(false);
+                    }}
+                  >
+                    <Text style={styles.successBtnSecondaryText}>
+                      Continuer
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.successBtnPrimary}
+                    onPress={() => {
+                      setShowSaveModal(false);
+                      setSaveSuccess(false);
+                      navigation.navigate("MyDesigns");
+                    }}
+                  >
+                    <MaterialCommunityIcons
+                      name="folder-multiple"
+                      size={16}
+                      color="#fff"
+                    />
+                    <Text style={styles.successBtnPrimaryText}>
+                      Voir mes designs
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
               <>
@@ -580,36 +705,147 @@ export default function RoomEditor3DScreen({ navigation, route }) {
                   ))}
                 </View>
 
-                <View style={styles.saveActions}>
-                  <TouchableOpacity
-                    style={styles.cancelBtn}
-                    onPress={() => setShowSaveModal(false)}
-                    disabled={isSaving}
-                  >
-                    <Text style={styles.cancelBtnText}>Annuler</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.confirmBtn}
-                    onPress={handleSaveDesign}
-                    disabled={isSaving}
-                    activeOpacity={0.85}
-                  >
-                    {isSaving ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={18}
-                          color="#fff"
-                        />
-                        <Text style={styles.confirmBtnText}>Enregistrer</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                {editingDesignIdRef.current ? (
+                  // ── Édition d'un design existant : 2 options ──
+                  <View style={styles.saveActionsCol}>
+                    <TouchableOpacity
+                      style={styles.confirmBtn}
+                      onPress={() => handleSaveDesign("update")}
+                      disabled={isSaving}
+                      activeOpacity={0.85}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons
+                            name="content-save"
+                            size={18}
+                            color="#fff"
+                          />
+                          <Text style={styles.confirmBtnText}>
+                            Mettre à jour
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.confirmBtnSecondary}
+                      onPress={() => handleSaveDesign("new")}
+                      disabled={isSaving}
+                      activeOpacity={0.85}
+                    >
+                      <MaterialCommunityIcons
+                        name="content-duplicate"
+                        size={18}
+                        color="#e94560"
+                      />
+                      <Text style={styles.confirmBtnSecondaryText}>
+                        Sauver comme nouveau
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.cancelBtnFull}
+                      onPress={() => setShowSaveModal(false)}
+                      disabled={isSaving}
+                    >
+                      <Text style={styles.cancelBtnText}>Annuler</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  // ── Nouveau design : juste "Enregistrer" ──
+                  <View style={styles.saveActions}>
+                    <TouchableOpacity
+                      style={styles.cancelBtn}
+                      onPress={() => setShowSaveModal(false)}
+                      disabled={isSaving}
+                    >
+                      <Text style={styles.cancelBtnText}>Annuler</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.confirmBtn}
+                      onPress={() => handleSaveDesign("new")}
+                      disabled={isSaving}
+                      activeOpacity={0.85}
+                    >
+                      {isSaving ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons
+                            name="check"
+                            size={18}
+                            color="#fff"
+                          />
+                          <Text style={styles.confirmBtnText}>Enregistrer</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </>
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ───── Modal QUIT confirm (avant retour Home) ───── */}
+      <Modal
+        visible={showQuitModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowQuitModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.quitModalCard}>
+            <View style={styles.quitIcon}>
+              <MaterialCommunityIcons
+                name="alert-circle-outline"
+                size={36}
+                color="#f59e0b"
+              />
+            </View>
+            <Text style={styles.quitTitle}>Quitter sans enregistrer ?</Text>
+            <Text style={styles.quitSubtitle}>
+              Tes modifications ne seront pas sauvées.
+            </Text>
+
+            <View style={styles.quitActions}>
+              <TouchableOpacity
+                style={styles.quitBtnSave}
+                onPress={() =>
+                  requireAuth(
+                    handleSaveThenQuit,
+                    "Connecte-toi pour sauvegarder avant de quitter",
+                  )
+                }
+                activeOpacity={0.85}
+              >
+                <MaterialCommunityIcons
+                  name="content-save-outline"
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.quitBtnSaveText}>
+                  Enregistrer puis quitter
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quitBtnDiscard}
+                onPress={handleQuitWithoutSave}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.quitBtnDiscardText}>
+                  Quitter sans sauver
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quitBtnCancel}
+                onPress={() => setShowQuitModal(false)}
+              >
+                <Text style={styles.quitBtnCancelText}>Annuler</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -802,12 +1038,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backArrow: { color: "#e94560", fontSize: 26, fontWeight: "bold" },
+  titleWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
   title: {
     color: "#fff",
     fontSize: 15,
     fontWeight: "bold",
-    flex: 1,
     textAlign: "center",
+    maxWidth: "85%",
+  },
+  dirtyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#f59e0b",
   },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 5 },
 
@@ -975,6 +1224,34 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 
+  // Save actions colonne (mode édition existant)
+  saveActionsCol: {
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 22,
+  },
+  confirmBtnSecondary: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#1a1a2e",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: "#e94560",
+  },
+  confirmBtnSecondaryText: {
+    color: "#e94560",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  cancelBtnFull: {
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   // Success state
   successView: { alignItems: "center", paddingVertical: 14 },
   successIcon: {
@@ -988,6 +1265,121 @@ const styles = StyleSheet.create({
   },
   successTitle: { color: "#fff", fontSize: 18, fontWeight: "bold" },
   successSubtitle: { color: "#a0a0c0", fontSize: 13, marginTop: 4 },
+  successActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 22,
+    width: "100%",
+  },
+  successBtnSecondary: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#1a1a2e",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#3d3d6e",
+  },
+  successBtnSecondaryText: {
+    color: "#a0a0c0",
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+  successBtnPrimary: {
+    flex: 1.4,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#e94560",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  successBtnPrimaryText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+
+  // ── Modal QUIT confirm ──
+  quitModalCard: {
+    backgroundColor: "#252544",
+    borderRadius: 22,
+    padding: 24,
+    width: "100%",
+    maxWidth: 380,
+    borderWidth: 1,
+    borderColor: "#3d3d6e",
+    alignItems: "center",
+  },
+  quitIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    borderWidth: 1.5,
+    borderColor: "rgba(245, 158, 11, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  quitTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  quitSubtitle: {
+    color: "#a0a0c0",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 18,
+  },
+  quitActions: {
+    flexDirection: "column",
+    gap: 8,
+    width: "100%",
+  },
+  quitBtnSave: {
+    backgroundColor: "#22c55e",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  quitBtnSaveText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  quitBtnDiscard: {
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.4)",
+  },
+  quitBtnDiscardText: {
+    color: "#ef4444",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  quitBtnCancel: {
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quitBtnCancelText: {
+    color: "#a0a0c0",
+    fontWeight: "600",
+    fontSize: 13,
+  },
 
   // ── Modal Finalisation (cloud) ──
   modalHeader: {

@@ -39,6 +39,7 @@ export async function saveDesign(design) {
       style: design.style || "modern",
       items: design.items || [],
       roomSize: design.roomSize || { width: 5, depth: 5 },
+      surfaces: design.surfaces || null,
       likes: 0,
       createdAt: new Date().toISOString(),
     };
@@ -57,6 +58,30 @@ export async function saveDesign(design) {
 export async function getDesignById(id) {
   const all = await listSavedDesigns();
   return all.find((d) => d.id === id) || null;
+}
+
+/**
+ * Met à jour un design existant (écrase). Préserve id + createdAt.
+ * @param {string} id
+ * @param {Object} partialData - { name, style, items, roomSize, surfaces, ... }
+ */
+export async function updateDesign(id, partialData) {
+  try {
+    const all = await listSavedDesigns();
+    const idx = all.findIndex((d) => d.id === id);
+    if (idx < 0) throw new Error("Design introuvable");
+    all[idx] = {
+      ...all[idx],
+      ...partialData,
+      id, // verrouille l'id
+      updatedAt: new Date().toISOString(),
+    };
+    await AsyncStorage.setItem(KEY, JSON.stringify(all));
+    return all[idx];
+  } catch (e) {
+    console.warn("updateDesign error:", e);
+    throw e;
+  }
 }
 
 /**

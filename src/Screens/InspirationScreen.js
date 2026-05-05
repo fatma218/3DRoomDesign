@@ -17,7 +17,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { INSPIRATION_ROOMS, STYLE_FILTERS } from "../data/inspirationRooms";
 import { getInspirationGridHTML } from "../utils/inspirationGridHTML";
-import { listSavedDesigns } from "../utils/savedDesigns";
 
 const { width } = Dimensions.get("window");
 const COLS = 2;
@@ -30,22 +29,9 @@ export default function InspirationScreen({ navigation }) {
   const [savedDesigns, setSavedDesigns] = useState([]);
   const webViewRef = useRef(null);
 
-  // Recharge les designs sauvegardés à chaque entrée dans l'écran
-  useFocusEffect(
-    useCallback(() => {
-      let mounted = true;
-      (async () => {
-        const saved = await listSavedDesigns();
-        if (mounted) setSavedDesigns(saved);
-      })();
-      return () => {
-        mounted = false;
-      };
-    }, []),
-  );
-
-  // Combine rooms par défaut + designs sauvegardés
-  const allRooms = [...INSPIRATION_ROOMS, ...savedDesigns];
+  // Inspiration ne contient QUE les chambres préfaites .glb
+  // Les designs persos sont uniquement dans MyDesigns
+  const allRooms = INSPIRATION_ROOMS;
   const filteredRooms = allRooms.filter(
     (r) => filter === "all" || r.style === filter,
   );
@@ -115,7 +101,7 @@ export default function InspirationScreen({ navigation }) {
     return () => {
       cancelled = true;
     };
-  }, [filter, webviewReady, savedDesigns]);
+  }, [filter, webviewReady]);
 
   const handleMessage = (event) => {
     try {
@@ -295,7 +281,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  filterChipActive: { backgroundColor: "#e94560", borderColor: "#e94560" },
+  filterChipActive: { backgroundColor: "#e0e1dd", borderColor: "#e0e1dd" },
   filterText: { color: "#a0a0c0", fontSize: 12, fontWeight: "500" },
   filterTextActive: { color: "#fff", fontWeight: "700" },
 

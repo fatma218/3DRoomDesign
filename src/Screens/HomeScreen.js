@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -11,10 +11,15 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useAuth } from "../context/AuthContext";
+import BottomNavBar from "../components/BottomNavBar";
+import MenuDrawer from "../components/MenuDrawer";
 
 const APP_NAME = "DECORA";
 
 export default function HomeScreen({ navigation }) {
+  const { requireAuth, user } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
   // ── Refs d'animation ────────────────────────────────────────────────────
   const sparkleScale = useRef(new Animated.Value(0)).current;
   const sparkleRotate = useRef(new Animated.Value(0)).current;
@@ -113,6 +118,13 @@ export default function HomeScreen({ navigation }) {
   const handleDesign = () => {
     navigation.navigate("StyleSelection");
   };
+
+  const handleMyDesigns = () => {
+    requireAuth(
+      () => navigation.navigate("MyDesigns"),
+      "Connecte-toi pour voir tes designs sauvegardés",
+    );
+  };
   const rotation = sparkleRotate.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
@@ -133,6 +145,18 @@ export default function HomeScreen({ navigation }) {
       {/* Halo décoratif en haut (subtil) */}
       <View style={styles.haloTop} />
       <View style={styles.haloBottom} />
+
+      {/* ───── Top Header (Menu ☰) ───── */}
+      <View style={styles.topHeader}>
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={() => setMenuOpen(true)}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="menu" size={22} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerLabel}>Menu</Text>
+      </View>
 
       {/* ───── Logo + Titre + Tagline ───── */}
       <View style={styles.logoSection}>
@@ -197,13 +221,13 @@ export default function HomeScreen({ navigation }) {
           <MaterialCommunityIcons
             name="lightbulb-on-outline"
             size={22}
-            color="#e94560"
+            color="#f57f93"
           />
           <Text style={styles.btnSecondaryText}>INSPIRATION</Text>
           <MaterialCommunityIcons
             name="arrow-right"
             size={20}
-            color="#e94560"
+            color="#c37380"
           />
         </TouchableOpacity>
 
@@ -214,7 +238,7 @@ export default function HomeScreen({ navigation }) {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={["#e94560", "#c8395a"]}
+            colors={["#ef899a", "#df7a92"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.btnPrimaryGradient}
@@ -224,12 +248,32 @@ export default function HomeScreen({ navigation }) {
             <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
+
+        {/* Bouton 3 — Mes Designs (outline tertiary) */}
+        <TouchableOpacity
+          style={styles.btnTertiary}
+          onPress={handleMyDesigns}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons
+            name="folder-multiple-outline"
+            size={20}
+            color="#a0a0c0"
+          />
+          <Text style={styles.btnTertiaryText}>MES DESIGNS</Text>
+          <MaterialCommunityIcons
+            name="arrow-right"
+            size={18}
+            color="#a0a0c0"
+          />
+        </TouchableOpacity>
       </Animated.View>
 
-      {/* ───── Footer ───── */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>v1.0 · MVP</Text>
-      </View>
+      {/* ───── BottomNavBar (3 tabs : Home / Favorites / Profile) ───── */}
+      <BottomNavBar active="home" />
+
+      {/* ───── Drawer latéral (Settings / About / Help / Logout) ───── */}
+      <MenuDrawer visible={menuOpen} onClose={() => setMenuOpen(false)} />
     </View>
   );
 }
@@ -240,7 +284,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingTop: 110,
-    paddingBottom: 40,
+    paddingBottom: 100, // ⭐ espace pour la BottomNavBar
     paddingHorizontal: 24,
   },
 
@@ -353,11 +397,50 @@ const styles = StyleSheet.create({
     marginLeft: 14,
   },
 
-  // Footer
-  footer: { alignItems: "center" },
-  footerText: {
-    color: "#404060",
+  // Bouton 3 — outline gris (Mes Designs)
+  btnTertiary: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: "rgba(160, 160, 192, 0.4)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  btnTertiaryText: {
+    color: "#a0a0c0",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 1.8,
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  // Top header (Menu)
+  topHeader: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    zIndex: 5,
+  },
+  menuBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerLabel: {
+    color: "#a0a0c0",
     fontSize: 11,
-    letterSpacing: 1.5,
+    fontWeight: "600",
+    letterSpacing: 1,
   },
 });
