@@ -2,9 +2,28 @@
 
 Application mobile de design d'intérieur permettant de créer et personnaliser une chambre en 3D.
 
+## Captures d'écran
+
+Galerie de l'application :
+
+![Accueil](<capture d'interface/homepage.jpeg>)
+![Catalogue](<capture d'interface/inspirationpage.jpeg>)
+![Sélection de style](<capture d'interface/chosirestylegamerpourledesignroom.jpeg>)
+
+![Interface de catégorie](<capture d'interface/categorieinterface.jpeg>)
+![Modèle 3D](<capture d'interface/InterfaceexempleModel3Ddanscategorie.jpeg>)
+![Vue éditeur 3D](<capture d'interface/editorscreen+affichagedemeublechoisie dans l'inventroy.jpeg>)
+![Vue éditeur 3D](<capture d'interface/deplacerdesmeubledansleplan3D.jpeg>)
+![Galerie de design sauvegardé](<capture d'interface/interfacedesavedesign.jpeg>)
+
+![Retour accueil](<capture d'interface/encasderetourpagehomesansenregistrerledesign.jpeg>)
+
+![Connexion / authentification](<capture d'interface/authentificationinterfaceencaspasencoreconecter.jpeg>)
+
 ## Description
 
 Application React Native / Expo pour concevoir des intérieurs avec :
+
 - Catalogue de meubles avec sélection de variantes et choix de couleurs
 - Aperçu 3D des modèles dans un modal interactif
 - Éditeur 3D principal via `WebView` avec rendu de modèles 3D
@@ -34,89 +53,29 @@ Application React Native / Expo pour concevoir des intérieurs avec :
 - Authentification mockée et gestion des permissions
 - Gallery d'inspiration avec modèles 3D
 
-## Structure du projet
-
-```
-.
-├── App.js
-├── package.json
-├── metro.config.js
-├── app.json
-├── assets/
-│   └── models/
-├── src/
-│   ├── Screens/
-│   │   ├── HomeScreen.js
-│   │   ├── CatalogScreen.js
-│   │   ├── RoomEditor3DScreen.js
-│   │   ├── Room3DViewerScreen.js
-│   │   ├── InspirationScreen.js
-│   │   ├── FavoritesScreen.js
-│   │   ├── MyDesignsScreen.js
-│   │   ├── StyleSelectionScreen.js
-│   │   └── ProfileScreen.js
-│   ├── components/
-│   │   ├── ModelPreview.js
-│   │   ├── BottomNavBar.js
-│   │   ├── MenuDrawer.js
-│   │   └── LoginModal.js
-│   ├── context/
-│   │   ├── RoomContext.js
-│   │   └── AuthContext.js
-│   ├── data/
-│   │   ├── furniture.js
-│   │   └── inspirationRooms.js
-│   └── utils/
-│       ├── cloudSync.js
-│       ├── editorHTML.js
-│       ├── savedDesigns.js
-│       └── likedRooms.js
-└── README.md
-```
-
 ## Installation et lancement
 
-### Sur votre PC (première installation)
-
 1. Cloner le projet :
+
    ```bash
    git clone https://github.com/[votre-username]/mobile-3D-RoomDesign.git
    cd mobile-3D-RoomDesign
    ```
 
 2. Installer les dépendances :
-   ```bash
-   npm install
-   ```
 
-3. Lancer l'application :
-   ```bash
-   npm start
-   ```
-
-4. Ouvrir sur un appareil :
-   - **iOS** : appuyer sur `i` ou scanner le QR code avec l'app Expo Go
-   - **Android** : appuyer sur `a` ou scanner le QR code avec l'app Expo Go
-
-### Sur un autre PC
-
-1. Cloner le projet :
-   ```bash
-   git clone https://github.com/[votre-username]/mobile-3D-RoomDesign.git
-   cd mobile-3D-RoomDesign
-   ```
-
-2. Installer les dépendances :
    ```bash
    npm install
    ```
 
 3. Vérifier que Expo CLI est installé globalement :
+
    ```bash
    npm install -g expo-cli
    ```
 
 4. Démarrer le serveur Expo :
+
    ```bash
    npm start
    ```
@@ -131,19 +90,6 @@ npm run android  # Lancer sur un émulateur Android
 npm run ios      # Lancer sur un simulateur iOS
 npm run web      # Lancer sur le web
 ```
-
-## Configuration cloud (optionnel)
-
-Pour activer la sauvegarde cloud JSONBin :
-
-1. Créer un compte sur [jsonbin.io](https://jsonbin.io)
-2. Récupérer votre clé API
-3. Mettre à jour `src/config/cloudConfig.js` :
-   ```javascript
-   export const CLOUD_CONFIG = {
-     JSONBIN_API_KEY: "votre_clé_api_ici"
-   };
-   ```
 
 ## Notes techniques
 
