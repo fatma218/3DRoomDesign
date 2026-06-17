@@ -6,19 +6,23 @@ Application mobile de design d'intérieur permettant de créer et personnaliser 
 
 Galerie de l'application :
 
-![Accueil](<capture d'interface/homepage.jpeg>)
-![Catalogue](<capture d'interface/inspirationpage.jpeg>)
-![Sélection de style](<capture d'interface/chosirestylegamerpourledesignroom.jpeg>)
-
-![Interface de catégorie](<capture d'interface/categorieinterface.jpeg>)
-![Modèle 3D](<capture d'interface/InterfaceexempleModel3Ddanscategorie.jpeg>)
-![Vue éditeur 3D](<capture d'interface/editorscreen+affichagedemeublechoisie dans l'inventroy.jpeg>)
-![Vue éditeur 3D](<capture d'interface/deplacerdesmeubledansleplan3D.jpeg>)
-![Galerie de design sauvegardé](<capture d'interface/interfacedesavedesign.jpeg>)
-
-![Retour accueil](<capture d'interface/encasderetourpagehomesansenregistrerledesign.jpeg>)
-
-![Connexion / authentification](<capture d'interface/authentificationinterfaceencaspasencoreconecter.jpeg>)
+<table>
+  <tr>
+    <td align="center"><img src="capture d'interface/homepage.jpeg" width="280" alt="Accueil" /><br/>Accueil</td>
+    <td align="center"><img src="capture d'interface/categorieinterface.jpeg" width="280" alt="Catalogue" /><br/>Catalogue</td>
+    <td align="center"><img src="capture d'interface/chosirestylegamerpourledesignroom.jpeg" width="280" alt="Sélection de style" /><br/>Sélection de style</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="capture d'interface/inspirationpage.jpeg" width="280" alt="Inspiration" /><br/>Inspiration</td>
+    <td align="center"><img src="capture d'interface/InterfaceexempleModel3Ddanscategorie.jpeg" width="280" alt="Modèle 3D" /><br/>Modèle 3D</td>
+    <td align="center"><img src="capture d'interface/deplacerdesmeubledansleplan3D.jpeg" width="280" alt="Éditeur 3D" /><br/>Éditeur 3D</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="capture d'interface/interfacedesavedesign.jpeg" width="280" alt="Design sauvegardé" /><br/>Design sauvegardé</td>
+    <td align="center"><img src="capture d'interface/encasderetourpagehomesansenregistrerledesign.jpeg" width="280" alt="Retour accueil" /><br/>Retour accueil</td>
+    <td align="center"><img src="capture d'interface/authentificationinterfaceencaspasencoreconecter.jpeg" width="280" alt="Connexion" /><br/>Connexion</td>
+  </tr>
+</table>
 
 ## Description
 
